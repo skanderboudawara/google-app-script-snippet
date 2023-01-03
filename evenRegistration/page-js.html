@@ -1,0 +1,153 @@
+<script>
+  var event_data = {};
+  const tzDialog = document.getElementById('tzDialog');
+  const outputBox = document.querySelector('output');
+  const selectTz = tzDialog.querySelector('select');
+  const confirmTzBtn = tzDialog.querySelector('#confirmTzBtn');
+
+  // Initiate buttons. Just call the initialisation function to generate buttons corresponding to events
+  function init(i,t,c,d,r,z) {
+    document.getElementById("calId").innerHTML =i;
+    document.getElementById("searchedText").innerHTML =t;
+    document.getElementById("color").innerHTML =c;
+    document.getElementById("days").innerHTML =d;
+    document.getElementById("replyTo").innerHTML =r;
+    document.getElementById("usedTimeZone").innerHTML =z;
+    google.script.run.withSuccessHandler(displayButtons).initialisation(i,t,c,d,z);
+  }
+  
+  function return_html(key_event){
+    return [
+      `<div class='webinarBtn ${key_event['btnActivity']}' style='background-color: #${key_event['finalColor']};' id='${key_event['id']}'>`,
+        `<p>${key_event['summary']} ${key_event['addMessage']}</p>`,
+        `<p>${key_event['start_date']}-${key_event['end_date']}</p>`,
+      `</div>`
+    ].join('')
+  }
+    
+  // Once initialized, display the buttons in the page and add event listeners to manage clicks
+  function displayButtons(jsonData){
+    // Display buttons of webinars
+    jsonData = JSON.parse(jsonData)
+    //console.table(jsonData)
+    usedTimezone = jsonData['usedTimezone']
+    event_data  = jsonData['data']
+    
+    htmlString = `<center><div id='changeTZbtn'><p>Time zone used: ${usedTimezone}. <u>Change</u></p></div></center>`
+
+    Object.values(event_data).forEach(function (key_event) {
+        htmlString += return_html(key_event)
+    })
+
+    document.getElementById("list_event").innerHTML = htmlString;
+       
+    // Add event listener on each button to trigger action on click
+    var webBtns = document.getElementsByClassName("webinarBtn active");
+
+    Array.from(webBtns).forEach(function(b) {
+      b.addEventListener("click", registerToEvent);
+    }); 
+
+    // Add event listener for the change timezone buttons
+    document.getElementById('changeTZbtn').addEventListener("click", () => {tzDialog.showModal();});   
+    selectTz.addEventListener('change', (e) => {confirmTzBtn.value = selectTz.value;});
+    confirmTzBtn.addEventListener("click", changeTimeZone);  
+  }
+
+  $('#search_event').on('click onchange keyup change clear', function () {
+      value_search = document.getElementById("search_event").value
+      htmlString = `<center><div id='changeTZbtn'><p>Time zone used: ${usedTimezone}. <u>Change</u></p></div></center>`
+
+      if (value_search == '') {
+
+        Object.values(event_data).forEach(function (key_event) {
+            htmlString += return_html(key_event)
+        })
+      } 
+      else {
+      
+    Object.keys(event_data).forEach(function (key_event) { 
+      key_upper = key_event.toUpperCase()
+      value_search = value_search.toUpperCase()
+
+      if (key_upper.match(value_search)){
+        htmlString += return_html(event_data[key_event])
+      }
+    })
+    }
+
+      document.getElementById("list_event").innerHTML = htmlString;
+
+      var webBtns = document.getElementsByClassName("webinarBtn active");
+
+      Array.from(webBtns).forEach(function(b) {
+        b.addEventListener("click", registerToEvent);
+      }); 
+
+      // Add event listener for the change timezone buttons
+      document.getElementById('changeTZbtn').addEventListener("click", () => {tzDialog.showModal();});   
+      selectTz.addEventListener('change', (e) => {confirmTzBtn.value = selectTz.value;});
+      confirmTzBtn.addEventListener("click", changeTimeZone);  
+  });
+    
+  // Change the timeZone according to selected value 
+  function changeTimeZone() {
+    // Get selected value
+    var newTimezone = confirmTzBtn.value;
+
+    // Change value stored in html
+    document.getElementById("usedTimeZone").innerHTML =newTimezone;
+
+    // Re-initialise the buttons with the new value
+    var i = document.getElementById("calId").innerHTML;
+    var t = document.getElementById("searchedText").innerHTML;
+    var c = document.getElementById("color").innerHTML;
+    var d = document.getElementById("days").innerHTML;
+    var r = document.getElementById("replyTo").innerHTML;
+    google.script.run.withSuccessHandler(displayButtons).initialisation(i,t,c,d,newTimezone);
+  }
+
+  
+  // Manages the click on a button and sends registration
+  function registerToEvent(e) {
+    
+    var id;
+    console.log(e.target.className);
+    if (e.target.className == "webinarBtn active") { id= e.target.id;} else { id=e.target.parentElement.id;}
+    
+
+    // Prepare messages for confirmation 
+    var clickedButton = document.getElementById(id);
+    var div = document.createElement('DIV');
+    div.innerHTML="<div class='info' style='display:block;' ><strong>Your request is taken into account.</strong>Please wait for confirmation.</div><div class='alert' style='display:none;' ><span class='closebtn' onclick=\"this.parentElement.parentElement.remove();\">&times;</span><strong>Something went wrong!</strong>Please contact the administrator of this site .</div><div class='success' style='display:none;' ><span class='closebtn' onclick=\"this.parentElement.parentElement.remove();\">&times;</span><strong>Registration confirmed.</strong> Please check you email inbox. You will receive an email from 'oneclick.registration@airbus.com'. Don't pay attention to the warning message, the email is safe.</div>";
+
+  
+    clickedButton.parentNode.insertBefore(div, clickedButton);
+
+    console.log(document.getElementById("calId").innerHTML)
+    console.log(id)
+    console.log(document.getElementById("replyTo").innerHTML)
+    console.log(document.getElementById("usedTimeZone").innerHTML)
+
+    google.script.run.withSuccessHandler(confirmRegistration).registerUserToEvent(document.getElementById("calId").innerHTML, id, document.getElementById("replyTo").innerHTML, document.getElementById("usedTimeZone").innerHTML)
+  }
+    
+    
+  function confirmRegistration(message) {
+console.log(message);
+    var objectId=message.substring(3);
+    var messageObject= document.getElementById(objectId).previousSibling;  
+  messageObject.querySelector('.info').style= "display: none;";
+  
+    if (message.substring(0,2)=="OK") {
+    messageObject.querySelector('.success').style= "display: block;";
+    } else {
+    messageObject.querySelector('.alert').style= "display: block;";
+  }
+
+  function listTimezones() {
+
+  }
+
+}
+</script>
