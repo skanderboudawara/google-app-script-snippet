@@ -300,7 +300,7 @@ function registerUserToEvent(calId, eventId, replyTo, usedTimeZone) {
     logArrays[0] = logArray;
 
     /* try
-    {var logSheet = SpreadsheetApp.openById("11tFWVcDgWAj8s6cJKKKahVkoNwfYjSSgyEN2KF3trMM").getSheetByName("Log");
+    {var logSheet = SpreadsheetApp.openById("").getSheetByName("Log");
     //Logger.log("LOG: "+logArrays);
     //Logger.log(logSheet.getSheetName());
     logSheet.getRange(logSheet.getLastRow() + 1, 1, 1, 7).setValues(logArrays);
