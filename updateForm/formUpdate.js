@@ -45,7 +45,8 @@ function getEventsByName() {
   search_args = {
     timeMin: ISODateString(searchPeriodMin),
     timeMax: ISODateString(searchPeriodMax),
-    singleEvents: false,
+    singleEvents: true,
+    showHiddenInvitations: true,
     maxResults: 2500,
     showDeleted: true,
   };
