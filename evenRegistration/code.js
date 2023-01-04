@@ -74,7 +74,8 @@ function initialisation(
   search_args = {
     timeMin: ISODateString(now),
     timeMax: ISODateString(searchPeriod),
-    singleEvents: false,
+    singleEvents: true,
+    showHiddenInvitations: true,
     maxResults: 2500,
     showDeleted: true,
   };
