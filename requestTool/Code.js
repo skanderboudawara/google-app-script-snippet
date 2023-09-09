@@ -1,6 +1,5 @@
 /*
  *
- * Code Created By Stephan
  * Updated by Skander BOUDAWARA
  * V2 : will take into account subtasks when they are in the title
  *
@@ -15,7 +14,7 @@ const COLUMN_NEEDED = [
   "Topic",
   "Status",
   "Référent",
-  "XBOM Assignment",
+  "project Assignment",
   "Progress status",
   "Workload",
   "Comments",
@@ -27,42 +26,53 @@ const COLUMN_NEEDED = [
   "Delivery date",
 ];
 
-const ACTUAL_SPREADSHEET = SpreadsheetApp.getActive();
+const ACTUAL_SPREADSHEET = SpreadsheetApp.getActive(); // Get the current spreadsheet
 
-const LISTE_SHEET = ACTUAL_SPREADSHEET.getSheetByName("Listes");
-const FEEDER_SHEET = ACTUAL_SPREADSHEET.getSheetByName("Feeder");
-const ANSWER_SHEET = ACTUAL_SPREADSHEET.getSheetByName("Requests");
-const WEBHOOK_REQUEST_CHAT = "";
-const WEBHOOK_ALTEN_CHAT = "";
+const LISTE_SHEET = ACTUAL_SPREADSHEET.getSheetByName("Listes"); // Get the sheet "Listes"
+const FEEDER_SHEET = ACTUAL_SPREADSHEET.getSheetByName("Feeder"); // Get the sheet "Feeder"
+const ANSWER_SHEET = ACTUAL_SPREADSHEET.getSheetByName("Requests");   // Get the sheet "Requests"
+const WEBHOOK_REQUEST_CHAT = ""; // Get the webhook link of the chat
+const WEBHOOK_ALTEN_CHAT = ""; // Get the webhook link of the chat
 
 const ANSWER_COLUMN_NAMES = ANSWER_SHEET.getRange(1, 1, 1, 69)
   .getValues()
-  .flat();
+  .flat(); // Get the column names of the sheet "Requests"
 
-const ID_XBOM_COLUMN = ANSWER_COLUMN_NAMES.indexOf("ID Request");
-const REQUESTOR_COLUMN = ANSWER_COLUMN_NAMES.indexOf("Name & First name");
-const TITLE_COLUMN = ANSWER_COLUMN_NAMES.indexOf("Title");
+const ID_project_COLUMN = ANSWER_COLUMN_NAMES.indexOf("ID Request"); // Get the column number of the column "ID Request"
+const REQUESTOR_COLUMN = ANSWER_COLUMN_NAMES.indexOf("Name & First name"); // Get the column number of the column "Name & First name"
+const TITLE_COLUMN = ANSWER_COLUMN_NAMES.indexOf("Title"); // Get the column number of the column "Title"
 
-const regExpSubtask = new RegExp("^\\[XBOM-\\d+-\\d+\\]");
-const regExpLastDigits = new RegExp("[0-9]+$");
-
-/*function test() {
-	titleAnswer = '[XBOM-1992-1] Skander';
-	if (regExpSubtask.test(titleAnswer)) {
-		xbomIdNumber = regExpSubtask.exec(titleAnswer)[0].replace('[', '').replace(']', '');
-		Logger.log(xbomIdNumber);
-		Logger.log(titleAnswer.substring(('[' + xbomIdNumber + '] ').length, titleAnswer.length));
-	}
-}*/
+const regExpSubtask = new RegExp("^\\[project-\\d+-\\d+\\]"); // Get the regex of the subtask
+const regExpLastDigits = new RegExp("[0-9]+$"); // Get the regex of the last digits
 
 function onOpen() {
+  /*
+    * This function will be executed when the spreadsheet is opened
+    * It will create a menu in the spreadsheet
+    * The menu will contain the function "correctPrevious"
+    * The function "correctPrevious" will be executed when the user will click on the menu
+    * The function "correctPrevious" will correct the previous items  
+  
+  :param: none
+
+  :return: none
+  */
   var ui = SpreadsheetApp.getUi();
-  ui.createMenu("✈️ XBOM")
+  ui.createMenu("✈️ project")
     .addItem("✍️ Correct items", "correctPrevious")
     .addToUi();
 }
 
 function verifNameChanges() {
+  /*
+  // This function will verify if the column names have been modified
+  // If the column names have been modified, it will send a message in the chat
+  // The message will contain the name of the column that has been modified
+
+  :param: none
+
+  :return: true if the column names have not been modified, false otherwise
+  */
   COLUMN_NEEDED_length = COLUMN_NEEDED.length;
   for (var indexColumn = 0; indexColumn < COLUMN_NEEDED_length; indexColumn++) {
     if (!ANSWER_COLUMN_NAMES.includes(COLUMN_NEEDED[indexColumn])) {
@@ -72,10 +82,22 @@ function verifNameChanges() {
   }
   return true;
 }
+
 Object.prototype.get1stNonEmptyRowFromBottom = function (
   columnNumber,
   offsetRow = 1
 ) {
+  /*
+  // This function will get the 1st non empty row from the bottom of the sheet
+  // It will search from the bottom of the sheet to the top
+  // It will search in the column "columnNumber"
+  // It will search from the row "offsetRow"
+
+  :param: columnNumber: the column number of the column to search in
+  :param: offsetRow: the row number of the row to start the search from
+
+  :return: the row number of the 1st non empty row from the bottom of the sheet
+  */
   const search = this.getRange(offsetRow, columnNumber, this.getMaxRows())
     .createTextFinder(".")
     .useRegularExpression(true)
@@ -83,22 +105,31 @@ Object.prototype.get1stNonEmptyRowFromBottom = function (
   return search ? search.getRow() : offsetRow;
 };
 
-// Please run this function.
-/*function main() {
-  const res = ANSWER_SHEET.get1stNonEmptyRowFromBottom(ID_XBOM_COLUMN + 1);
-  Logger.log(res); // Retrieve the 1st non empty row of column "C" by searching from BOTTOM of sheet.
-}
 
-function test(){
-  var lastRowXbomId = getLastRowFromColumn(ANSWER_SHEET, ID_XBOM_COLUMN + 1) + 1;
-  Logger.log(lastRowXbomId)
-}*/
 function getLastRowFromColumn(sheet, colNumber) {
+  /*
+  // This function will get the last row from the column "colNumber" of the sheet "sheet"
+
+  :param: sheet: the sheet to search in
+  :param: colNumber: the column number of the column to search in
+
+  :return: the row number of the last row from the column "colNumber" of the sheet "sheet"
+  */
   return ANSWER_SHEET.get1stNonEmptyRowFromBottom(colNumber);
   //return sheet.getRange(sheet.getMaxRows(), colNumber).getNextDataCell(SpreadsheetApp.Direction.UP).getRow();
 }
 
 function notifyViaChat(messageToSend, webhookLink) {
+  /*
+  // This function will send a message in the chat
+  // The message will contain the message "messageToSend"
+  // The message will be sent in the chat "webhookLink"
+
+  :param: messageToSend: the message to send in the chat
+  :param: webhookLink: the webhook link of the chat
+
+  :return: none
+  */
   var message = { text: messageToSend };
   var payload = JSON.stringify(message);
   var options = {
@@ -107,20 +138,42 @@ function notifyViaChat(messageToSend, webhookLink) {
     payload: payload,
   };
 
-  var response = UrlFetchApp.fetch(webhookLink, options).getContentText();
+  var response = UrlFetchApp.fetch(webhookLink, options).getContentText(); // Send the message in the chat
 }
 
 function countTiret(text) {
+  /*
+  // This function will count the number of tiret in the text "text"
+
+  :param: text: the text to count the number of tiret in
+
+  :return: the number of tiret in the text "text"
+  */
   return (text.match(new RegExp("-", "g")) || []).length;
 }
 
 function onFormSubmit(e) {
+  /*
+  // This function will be executed when a form is submitted
+  // It will get the values of the form
+
+  :param: e: the event that triggered the function
+
+  :return: none
+  */
   Logger.log(e.values);
   var answerRowIndex = e.range.getRow();
   registerNecessaryInfo(answerRowIndex);
 }
 
 function correctPrevious() {
+  /*
+  // This function will be executed when the user will click on the menu
+  
+  :param: none
+
+  :return: none
+  */
   var ui = SpreadsheetApp.getUi();
   var response = ui.prompt(
     "It Should be used in case of bug",
@@ -128,13 +181,13 @@ function correctPrevious() {
     ui.ButtonSet.OK_CANCEL
   );
   if (response.getSelectedButton() == ui.Button.OK) {
-    var lastRowXbomId =
-      getLastRowFromColumn(ANSWER_SHEET, ID_XBOM_COLUMN + 1) + 1;
-    console.log(lastRowXbomId);
+    var lastRowprojectId =
+      getLastRowFromColumn(ANSWER_SHEET, ID_project_COLUMN + 1) + 1;
+    console.log(lastRowprojectId);
     var answerSheetLastRow = getLastRowFromColumn(ANSWER_SHEET, 1) + 1;
     console.log(answerSheetLastRow);
     for (
-      var indexRow = lastRowXbomId;
+      var indexRow = lastRowprojectId;
       indexRow <= answerSheetLastRow;
       indexRow++
     ) {
@@ -146,9 +199,18 @@ function correctPrevious() {
 }
 
 function registerNecessaryInfo(indexRow, sendMessage = true) {
+  /*
+  // This function will register the necessary info in the sheet "Requests"
+  // It will get the values of the row "indexRow"
+
+  :param: indexRow: the row number of the row to get the values of
+  :param: sendMessage: true if the function should send a message in the chat, false otherwise
+
+  :return: none
+  */
   answerRowIndex = indexRow;
-  var lastXbomIdNumber = "ERROR";
-  var xbomIdNumber = "ERROR";
+  var lastprojectIdNumber = "ERROR";
+  var projectIdNumber = "ERROR";
   if (!verifNameChanges()) {
     return;
   }
@@ -158,38 +220,39 @@ function registerNecessaryInfo(indexRow, sendMessage = true) {
   ).getValue();
 
   if (regExpSubtask.test(titleAnswer)) {
-    xbomIdNumber = regExpSubtask
+    // If the title contains a subtask
+    projectIdNumber = regExpSubtask
       .exec(titleAnswer)[0]
       .replace("[", "")
       .replace("]", "");
     titleAnswer = titleAnswer.substring(
-      ("[" + xbomIdNumber + "] ").length,
+      ("[" + projectIdNumber + "] ").length,
       titleAnswer.length
     );
   } else {
-    var lastRowXbomId = getLastRowFromColumn(ANSWER_SHEET, ID_XBOM_COLUMN + 1);
-    var allXbomId = ANSWER_SHEET.getRange(
+    var lastRowprojectId = getLastRowFromColumn(ANSWER_SHEET, ID_project_COLUMN + 1);
+    var allprojectId = ANSWER_SHEET.getRange(
       1,
-      ID_XBOM_COLUMN + 1,
-      lastRowXbomId,
+      ID_project_COLUMN + 1,
+      lastRowprojectId,
       1
     )
       .getValues()
       .flat();
-    var allXbomId_length = allXbomId.length;
+    var allprojectId_length = allprojectId.length;
 
-    for (var i = allXbomId_length - 1; i > 0; i--) {
-      if (countTiret(allXbomId[i]) == 1) {
-        lastXbomIdNumber = allXbomId[i];
+    for (var i = allprojectId_length - 1; i > 0; i--) {
+      if (countTiret(allprojectId[i]) == 1) {
+        lastprojectIdNumber = allprojectId[i];
         break;
       }
     }
-    xbomIdNumber =
-      "XBOM-" + (parseInt(regExpLastDigits.exec(lastXbomIdNumber)[0]) + 1);
+    projectIdNumber =
+      "project-" + (parseInt(regExpLastDigits.exec(lastprojectIdNumber)[0]) + 1);
   }
 
-  ANSWER_SHEET.getRange(answerRowIndex, ID_XBOM_COLUMN + 1)
-    .setValue(xbomIdNumber)
+  ANSWER_SHEET.getRange(answerRowIndex, ID_project_COLUMN + 1)
+    .setValue(projectIdNumber)
     .setHorizontalAlignment("center");
   ANSWER_SHEET.getRange(
     answerRowIndex,
@@ -209,7 +272,7 @@ function registerNecessaryInfo(indexRow, sendMessage = true) {
   ).setValue("Waiting assignment");
   ANSWER_SHEET.getRange(
     answerRowIndex,
-    ANSWER_COLUMN_NAMES.indexOf("XBOM Assignment") + 1
+    ANSWER_COLUMN_NAMES.indexOf("project Assignment") + 1
   ).setValue("Waiting assignment");
   ANSWER_SHEET.getRange(
     answerRowIndex,
@@ -219,18 +282,11 @@ function registerNecessaryInfo(indexRow, sendMessage = true) {
     answerRowIndex,
     ANSWER_COLUMN_NAMES.indexOf("Workload") + 1
   ).setValue("Waiting level");
-  /*ANSWER_SHEET.getRange(answerRowIndex, ANSWER_COLUMN_NAMES.indexOf('Comments') + 1).setValue('None');
-	ANSWER_SHEET.getRange(answerRowIndex, ANSWER_COLUMN_NAMES.indexOf('Creation week') + 1).setFormula('=WEEKNUM(A' + answerRowIndex + ',21)');
-	ANSWER_SHEET.getRange(answerRowIndex, ANSWER_COLUMN_NAMES.indexOf('Previsional delivery week') + 1).setFormula('=WEEKNUM(AE' + answerRowIndex + ',21)');
-	ANSWER_SHEET.getRange(answerRowIndex, ANSWER_COLUMN_NAMES.indexOf('Closing week') + 1).setFormula('=WEEKNUM(AF' + answerRowIndex + ',21)');
-	ANSWER_SHEET.getRange(answerRowIndex, ANSWER_COLUMN_NAMES.indexOf('DELIVERY WEEK EXPECTED ELSE CLIENT') + 1).setFormula('=IF(ISBLANK(AE' + answerRowIndex + ')=TRUE,WEEKNUM(I' + answerRowIndex + ',21),WEEKNUM(AE' + answerRowIndex + ',21))');
-	ANSWER_SHEET.getRange(answerRowIndex, ANSWER_COLUMN_NAMES.indexOf('Begin date') + 1).setFormula('=IF(AD' + answerRowIndex + '<>"",AD' + answerRowIndex + ',AL' + answerRowIndex + '-15)');
-	ANSWER_SHEET.getRange(answerRowIndex, ANSWER_COLUMN_NAMES.indexOf('Delivery date') + 1).setFormula('=IF(AE' + answerRowIndex + '<>"",AE' + answerRowIndex + ',I' + answerRowIndex + ')');*/
   ANSWER_SHEET.getRange(answerRowIndex, TITLE_COLUMN + 1).setValue(titleAnswer);
 
   messageToSendInChat =
     "```🆕 <users/all> \n\nA new item [" +
-    xbomIdNumber +
+    projectIdNumber +
     "] - " +
     titleAnswer +
     "\nfrom: " +
@@ -246,6 +302,13 @@ function registerNecessaryInfo(indexRow, sendMessage = true) {
 }
 
 function onEdit(e) {
+  /*
+  // This function will be executed when a cell is edited
+
+  :param: e: the event that triggered the function
+
+  :return: none
+  */
   /*if (Session.getActiveUser().getEmail() == '') {
     return
   }*/

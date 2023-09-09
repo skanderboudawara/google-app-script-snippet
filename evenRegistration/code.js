@@ -2,14 +2,42 @@
 // Main function
 // Create the html page based on the file 'page.html'+ generate the call to the init function with parameters given in URL
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+function testDoGet() {
+  // Test doGet function
+  var assert = require("assert");
+  var e = {
+    parameter: {
+      calId: "calId",
+      Text: "Text",
+      Color: "Color",
+      Days: "Days",
+      ReplyTo: "ReplyTo",
+      TimeZone: "TimeZone",
+    },
+  };
+  assert.equal(doGet(e), "html" );
+}
 function doGet(e) {
+  /*
+  This function is called when the webapp is called with parameters
+  This function will call the init function with the parameters given in the URL
+
+  :param e: the parameters passed in the URL
+
+  :return: the HTML page with the buttons
+  */
+
+  // these are the logs of the Session
+  console.log(Session.getActiveUser().getEmail());
   console.log(Session.getActiveUser().getUserLoginId());
   // Build and display HTML page
+  // These are the parameters passed in the URL
   var tmp = HtmlService.createTemplateFromFile("page");
   var html = tmp.evaluate().getContent();
   var numDays = 120;
   var color = "00205b";
-  var replyTo = "noreply@airbus.com";
+  var replyTo = "email";
   var usedTimezone = "Europe/Paris";
 
   if (e.parameter.Color != undefined) {
@@ -24,7 +52,8 @@ function doGet(e) {
   if (e.parameter.TimeZone != undefined) {
     usedTimezone = e.parameter.TimeZone;
   }
-
+  
+  // Get the HTML code for the buttons
   return HtmlService.createTemplate(
     html +
       "<script>\n" +
@@ -46,7 +75,27 @@ function doGet(e) {
     .setTitle("📅 Events");
 }
 
+function testIsBlank() {
+  // Test isBlank function
+  var assert = require("assert");
+  assert.equal(isBlank(""), true);
+  assert.equal(isBlank(" "), true);
+  assert.equal(isBlank("  "), true);
+  assert.equal(isBlank("a"), false);
+  assert.equal(isBlank(" a"), false);
+  assert.equal(isBlank("a "), false);
+  assert.equal(isBlank(" a "), false);
+  assert.equal(isBlank(" a b "), false);
+}
 function isBlank(str) {
+  /*
+  This function is used to check if a string is empty or contains only spaces
+
+  :param str: the string to check
+
+  :return: true if the string is empty or contains only spaces, false otherwise
+
+  */
   return !str || /^\s*$/.test(str);
 }
 
@@ -56,6 +105,26 @@ function isBlank(str) {
 // calendar. Set the 'color' background.
 // Check first if the event session is full or not (if limit defined)
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+function testInitialisation() {
+  // Test initialisation function
+  var assert = require("assert");
+  var calId = "calId";
+  var searchedText = "searchedText";
+  var color = "color";
+  var numberofDaysForSearch = 120;
+  var usedTimezone = "Europe/Paris";
+  var jsonData = {
+    usedTimezone: usedTimezone,
+    data: {},
+  };
+  assert.equal(
+    initialisation(
+      calId, searchedText, color, numberofDaysForSearch, usedTimezone 
+    ), JSON.stringify(jsonData)
+  );
+}
+
 function initialisation(
   calId,
   searchedText = null,
@@ -63,14 +132,33 @@ function initialisation(
   numberofDaysForSearch = 360,
   usedTimezone = "Europe/Paris"
 ) {
+  /*
+  This function is called when the webapp is called with parameters
+  This function will call the init function with the parameters given in the URL
+
+  :param calId: the calendar ID
+  :param searchedText: the text to search in the title of the events
+  :param color: the color of the buttons
+  :param numberofDaysForSearch: the number of days to search for events
+  :param usedTimezone: the timezone to use for the events
+
+  :return: the HTML page with the buttons
+
+  */
+
+  // Get the calendar
   var cal = CalendarApp.getCalendarById(calId);
 
   // Get calendar events (webinars - next 3 months)
+  // Get the current date
   var now = new Date();
+
+  // Get the date in 3 months
   var searchPeriod = new Date(
     now.getTime() + numberofDaysForSearch * 24 * 60 * 60 * 1000
   );
 
+  // Prepare search arguments
   search_args = {
     timeMin: ISODateString(now),
     timeMax: ISODateString(searchPeriod),
@@ -80,25 +168,14 @@ function initialisation(
     showDeleted: true,
   };
 
+  // If a text is given, search for it in the title of the events
   if (isBlank(searchedText)) {
-    Logger.log("skander", searchedText);
     search_args["q"] = searchedText;
   }
 
   // Get events or instances in case of recurring event
-  var events = Calendar.Events.list(calId, search_args).items;
-
-  Logger.log(events);
   // If the first event has a reccurence, we consider it's only instances of a recurring event
-  /*if (events.length > 0) {
-    if (events[0].recurringEventId != null) {
-      var recurringId = events[0].recurringEventId;
-      var events = Calendar.Events.instances(calId, recurringId, {
-        timeMin: ISODateString(now),
-        timeMax: ISODateString(searchPeriod),
-      }).items;
-    }
-  }*/
+  var events = Calendar.Events.list(calId, search_args).items;
 
   // Sort events per starting date
   events.sort(compareStartingDates);
@@ -109,18 +186,23 @@ function initialisation(
     data: {},
   };
 
+  // Loop on events
   events.forEach(function (e) {
     // We first check if the event has a limit of participants and if this limit is reached
-
+    // If yes, we don't display the button
     var isPossible = true;
     // Get the limit of participants (if any)
+    // Get the description of the event
     var body = e.getDescription();
     var guests;
     var limit;
     var seatsAvailable = 0;
 
     if (body != "") {
+      // There is a description
+      // Search for the limit using a regular expression (if any)
       var regExp = new RegExp(/\[Limit: ?(\d+)\]/g);
+      // Get the limit (if any) and the number of participants who accepted
       var res = regExp.exec(body);
       var limit;
       if (res != null) {
@@ -130,7 +212,9 @@ function initialisation(
         guests = e.attendees;
 
         if (guests != undefined) {
+          // There are guests
           guests = guests.filter(function (g) {
+            // We only keep guests who accepted or who didn't answer yet
             return (
               g.responseStatus == "accepted" ||
               g.responseStatus == "needsAction"
@@ -138,37 +222,45 @@ function initialisation(
           });
 
           if (guests.length >= limit) {
+            // The limit is reached
             isPossible = false;
           } else {
+            // The limit is not reached
             seatsAvailable = limit - guests.length;
           }
         } else {
+          // There are no guests yet
           seatsAvailable = limit; // By default number of seats available is the limit, if no guests yet
         }
       }
     }
 
     // Depending on this result, color is requested color or grey, and button is active or not
-
+    // Prepare HTML code for the button
     var finalColor;
     var btnActivity;
     var addMessage = "";
 
     if (isPossible == true) {
+      // The limit is not reached
+      // We can display the button with the requested color and the message "Session open" or "x seats remaining" (if limit)
       finalColor = color;
       btnActivity = "active";
       if (seatsAvailable > 0) {
+        // There is a limit and there are seats available
         addMessage = " (" + seatsAvailable.toString() + " seat(s) remaining)";
       } else {
+        // There is no limit or the limit is reached
         addMessage = " (Session open)";
       }
     } else {
+      // The limit is reached or there is no limit and the event is full (no more seats available)
       finalColor = "808B96"; // grey
       btnActivity = "inactive";
       addMessage = " (Session full)";
     }
     try {
-      // Prepare HTML code for the button
+      // Prepare HTML code for the button (with the event title, the starting date and the ending date)
       event_data = {
         btnActivity: btnActivity,
         finalColor: finalColor,
@@ -186,7 +278,8 @@ function initialisation(
           "HH:mm"
         ),
       };
-
+      
+      // Add the event to the list of events to be displayed
       start_date = new Date(e.start.dateTime);
       if (
         (start_date >= new Date()) & // start date should be supperior than actual tie
@@ -199,9 +292,9 @@ function initialisation(
     }
   });
 
+  // Return the HTML code for the buttons to be displayed on the page (in the div with id 'events') and the JSON data for the calendar
   return JSON.stringify(jsonData);
 
-  //return htmlString;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -209,10 +302,34 @@ function initialisation(
 // Just add the user in the list of guests of the selected event
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// create unit test for registerUserToEvent
+function testRegisterUserToEvent() {
+  // Test registerUserToEvent function
+  var assert = require("assert");
+  var calId = "calId";
+  var eventId = "eventId";
+  var replyTo = "replyTo";
+  var usedTimeZone = "usedTimeZone";
+  assert.equal( registerUserToEvent(calId, eventId, replyTo, usedTimeZone), "OK_eventId" );
+}
 function registerUserToEvent(calId, eventId, replyTo, usedTimeZone) {
-  var message;
+  /*
+  This function is called when the user clicks on a button
+  This function will add the user in the list of guests of the selected event
+
+  :param calId: the calendar ID
+  :param eventId: the event ID
+  :param replyTo: the email address to reply to
+  :param usedTimeZone: the timezone to use for the events
+
+  :return: the HTML page with the buttons
+
+  */
 
   // Used for Debug
+  var message;
+
+  // Used for Debug - Log the event in the Log sheet of the spreadsheet (if any)
   var logArray = [];
   logArray.push(new Date());
   logArray.push(calId);
@@ -220,16 +337,17 @@ function registerUserToEvent(calId, eventId, replyTo, usedTimeZone) {
   // End Debug
 
   try {
+    // Get the event to update it with the new guest added (the user) and send the invitation to the user
     var event = Calendar.Events.get(calId, eventId);
 
-    var guestEmail = Session.getActiveUser().getEmail();
-    var aliases = GmailApp.getAliases();
+    var guestEmail = Session.getActiveUser().getEmail(); // Get the email address of the user
+    var aliases = GmailApp.getAliases(); // Get the aliases of the user
 
     // Guest added and confrmation message prepared
 
     var attendees = event.attendees;
     if (attendees) {
-      // If there are already attendees, push the new attendee onto the list
+      // If there are already attendees, push the new attendee onto the list of attendees for the event
       attendees.push({ email: guestEmail });
       var resource = { attendees: attendees };
     } else {
@@ -238,36 +356,37 @@ function registerUserToEvent(calId, eventId, replyTo, usedTimeZone) {
     }
 
     var args = { sendUpdates: "none" };
-    // https://developers.google.com/calendar/api/v3/reference/events/patch
+    // https://developers.google.com/calendar/api/v3/reference/events/patch for more info on args
+    // args.sendUpdates = "none" will not send an email to the guest
+    // args.sendUpdates = "all" will send an email to the guest
+    // args.sendUpdates = "externalOnly" will send an email to the guest only if the guest is not in the same domain as the organizer
     try {
+      // Update the event with the new guest added and send the invitation to the user
+      // https://developers.google.com/calendar/api/v3/reference/events/patch for more info on Calendar.Events.patch
       var send_invitation = Calendar.Events.patch(
-        resource,
-        calId,
-        eventId,
-        args
+        resource, // the resource to patch
+        calId, // the calendar ID
+        eventId, // the event ID
+        args // the arguments
       );
       Logger.log(send_invitation);
     } catch (err) {
       Logger.log(err);
-      message = "KO_" + eventId;
+      message = "KO_" + eventId; // Used for Debug
       return message;
     }
 
     // get recent updates
-    var event = Calendar.Events.get(calId, eventId);
-
-    //var splitEventId = event.iCalUID.split('@');
+    var event = Calendar.Events.get(calId, eventId); // Get the event to update it with the new guest added (the user) and send the invitation to the user
 
     var eventURL =
       "https://www.google.com/calendar/render?action=VIEW&eid=" +
-      Utilities.base64Encode(eventId + " " + guestEmail);
+      Utilities.base64Encode(eventId + " " + guestEmail); // Create the URL to the event in the calendar (with the event ID and the email address of the user)
     if (eventURL.slice(-1) === "=") {
       eventURL = eventURL.slice(0, -1);
-    }
+    } // remove trailing "="
 
-    Logger.log(eventURL);
-
-    // var icsFile=makeICS(event);
+    Logger.log(eventURL); // Used for Debug
 
     // For Debug
     logArray.push(guestEmail);
@@ -277,18 +396,14 @@ function registerUserToEvent(calId, eventId, replyTo, usedTimeZone) {
     var logArrays = [];
     logArrays[0] = logArray;
 
-    /* try
-    {var logSheet = SpreadsheetApp.openById("").getSheetByName("Log");
-    //Logger.log("LOG: "+logArrays);
-    //Logger.log(logSheet.getSheetName());
-    logSheet.getRange(logSheet.getLastRow() + 1, 1, 1, 7).setValues(logArrays);
-    // End debug
-    } catch (e) {
-      Logger.log('skip')
-    }*/
 
-    var emailBody =
-      "Dear participant, Your registration is confirmed. We thank you for your interest.If you are a Google user, we invite you to accept the event in your calendar directly. If you are not a google user, please download the ICS file attached to this email and then accept the invitation.&nbsp; Would you have any question, feel free to answer to this email.";
+    var emailBody = 
+      "Dear participant, Your registration is confirmed. \
+      We thank you for your interest.If you are a Google user, \
+      we invite you to accept the event in your calendar directly. \
+      If you are not a google user, please download the ICS file attached \
+      to this email and then accept the invitation.&nbsp; \
+      Would you have any question, feel free to answer to this email.";
 
     var guestName = guestEmail
       .split(".")[0]
@@ -389,26 +504,88 @@ function registerUserToEvent(calId, eventId, replyTo, usedTimeZone) {
 // Technical functions
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 function include(filename) {
+  /*
+  This function is used to include the HTML file in the HTML page
+
+  :param filename: the name of the HTML file to include
+
+  :return: the HTML code of the file
+
+  */
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
-//function putCache(key, array) {cache.put(key, JSON.stringify(array) );}
-//function getCache(key) {return JSON.parse(cache.get(key));}
 
+// create unit test for ldapDate
+function testLdapDate() {
+  // Test ldapDate function
+  var assert = require("assert");
+  var d = new Date();
+  assert.equal(ldapDate(d), Utilities.formatDate(d, "GMT+00:00", "yyyyMMdd") + "T" + Utilities.formatDate(d, "GMT+00:00", "HHmmss") + "Z" );
+}
 function ldapDate(d) {
+  /*
+  This function is used to format a date in the LDAP format
+
+  :param d: the date to format
+
+  :return: the date in the LDAP format
+
+  */
   var formattedDate =
     Utilities.formatDate(d, "GMT+00:00", "yyyyMMdd") +
     "T" +
     Utilities.formatDate(d, "GMT+00:00", "HHmmss");
   return formattedDate + "Z";
 }
+
+// create unit test for rfc3339Date
+function testRfc3339Date() {
+  // Test rfc3339Date function
+  var assert = require("assert");
+  var d = new Date();
+  assert.equal(rfc3339Date(d), Utilities.formatDate(d, "GMT+00:00", "yyyy-MM-dd") + "T" + Utilities.formatDate(d, "GMT+00:00", "HH:mm:ss") + "Z" );
+}
 function rfc3339Date(d) {
+  /*
+  This function is used to format a date in the RFC3339 format
+
+  :param d: the date to format
+
+  :return: the date in the RFC3339 format
+
+  */
   var formattedDate =
     Utilities.formatDate(d, "GMT+00:00", "yyyy-MM-dd") +
     "T" +
     Utilities.formatDate(d, "GMT+00:00", "HH:mm:ss");
   return formattedDate + "Z";
 }
+
+function testMakeICS() {
+  // Test makeICS function
+  var assert = require("assert");
+  var e = {
+    guests: [ {guestName: "guestName", guestEmail: "guestEmail"} ],
+    start: {dateTime: "dateTime"},
+    end: {dateTime: "dateTime"},
+    iCalUID: "iCalUID",
+    id: "id",
+    created: "created",
+    description: "description",
+    location: "location",
+    summary: "summary",
+  };
+  assert.equal(makeICS(e), "icsFile" );
+}
 function makeICS(event) {
+  /*
+  This function is used to create the ICS file to be attached to the email sent to the user
+
+  :param event: the event to create the ICS file for
+
+  :return: the ICS file
+
+  */
   var e = event;
   var attendees = [];
   var guests = e.guests;
@@ -458,14 +635,49 @@ function makeICS(event) {
   var icsFile = Utilities.newBlob(vcal, "text/calendar", "invite.ics");
   return icsFile;
 }
+
+function testCompareStartingDates() {
+  // Test compareStartingDates function
+  var assert = require("assert");
+  var a = {start: {dateTime: "dateTime"}};
+  var b = {start: {dateTime: "dateTime"}};
+  assert.equal(compareStartingDates(a, b), 1 );
+  assert.equal(compareStartingDates(b, a), -1 );
+  assert.equal(compareStartingDates(a, a), 0 );
+}
 function compareStartingDates(a, b) {
+  /*
+  This function is used to compare the starting dates of two events
+
+  :param a: the first event
+  :param b: the second event
+
+  :return: 1 if the starting date of the first event is after the starting date of the second event, -1 otherwise
+
+  */
   return new Date(a.start.dateTime).getTime() >
     new Date(b.start.dateTime).getTime()
     ? 1
     : -1;
 }
 
+function testISODateString() {
+  // Test ISODateString function
+  var assert = require("assert");
+  var d = new Date();
+  assert.equal(ISODateString(d), Utilities.formatDate(d, "GMT+00:00", "yyyy-MM-dd") + "T" + Utilities.formatDate(d, "GMT+00:00", "HH:mm:ss") + "Z" );
+  assert.equal(ISODateString(d), rfc3339Date(d) );
+  assert.equal(ISODateString(d), ISODate(d) + "T" + Utilities.formatDate(d, "GMT+00:00", "HH:mm:ss") + "Z" );
+}
 function ISODateString(d) {
+  /*
+  This function is used to format a date in the ISO format
+
+  :param d: the date to format
+
+  :return: the date in the ISO format
+
+  */
   function pad(n) {
     return n < 10 ? "0" + n : n;
   }
@@ -483,4 +695,123 @@ function ISODateString(d) {
     pad(d.getUTCSeconds()) +
     "Z"
   );
+}
+
+function testISODate() {
+  // Test ISODate function
+  var assert = require("assert");
+  var d = new Date();
+  assert.equal(ISODate(d), Utilities.formatDate(d, "GMT+00:00", "yyyy-MM-dd") );
+  assert.equal(ISODate(d), ISODateString(d).split("T")[0] );
+  assert.equal(ISODate(d), rfc3339Date(d).split("T")[0] );
+}
+function ISODate(d) {
+  /*
+  This function is used to format a date in the ISO format
+
+  :param d: the date to format
+
+  :return: the date in the ISO format
+
+  */
+  function pad(n) {
+    return n < 10 ? "0" + n : n;
+  }
+  return (
+    d.getUTCFullYear() +
+    "-" +
+    pad(d.getUTCMonth() + 1) +
+    "-" +
+    pad(d.getUTCDate())
+  );
+}
+
+function testCompareDates() {
+  // Test compareDates function
+  var assert = require("assert");
+  var a = "a";
+  var b = "b";
+  assert.equal(compareDates(a, b), -1 );
+  var a = "12/31/2020";
+  var b = "01/01/2021";
+  assert.equal(compareDates(a, b), -1 );
+  var a = "01/01/2021";
+  var b = "12/31/2020";
+  assert.equal(compareDates(a, b), 1 );
+}
+function compareDates(a, b) {
+  /*
+  This function is used to compare two dates
+
+  :param a: the first date
+  :param b: the second date
+
+  :return: 1 if the first date is after the second date, -1 otherwise
+
+  */
+  return new Date(a).getTime() > new Date(b).getTime() ? 1 : -1;
+}
+
+function testContainsObject() {
+  // Test containsObject function
+  var assert = require("assert");
+  var obj = "obj";
+  var list = ["obj"];
+  assert.equal(containsObject(obj, list), true );
+
+  var obj = "obj";
+  var list = ["obj1"];
+  assert.equal(containsObject(obj, list), false );
+}
+function containsObject(obj, list) {
+  /*
+  This function is used to check if an object is in a list
+
+  :param obj: the object to check
+  :param list: the list to check
+
+  :return: true if the object is in the list, false otherwise
+
+  */
+  var i;
+  for (i = 0; i < list.length; i++) {
+    if (list[i] === obj) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function testSheetLog() {
+  // Test sheetLog function
+  var assert = require("assert");
+  var type = "type";
+  var message = "message";
+  assert.equal(sheetLog(type, message), undefined );
+}
+function sheetLog(type, message) {
+  /*
+  This function is used to log an event in the Log sheet of the spreadsheet
+
+  :param type: the type of the event
+  :param message: the message of the event
+
+  :return: None
+
+  */
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Log");
+  var lastRow = sheet.getLastRow();
+
+  var now = new Date();
+  var logArray = [];
+  logArray.push(now);
+  logArray.push(type);
+  logArray.push(message);
+
+  var logArrays = [];
+  logArrays[0] = logArray;
+
+  var range = sheet.getRange(lastRow + 1, 1, 1, logArrays[0].length);
+  range.setValues(logArrays);
 }

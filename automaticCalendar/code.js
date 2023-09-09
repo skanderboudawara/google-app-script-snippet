@@ -1,6 +1,3 @@
-// Traitement pour récupérer les absences déclarées dans les calendriers sous la forme d'une Absence du bureau.
-// Les absences trouvées sont renseignées dans l'onglet 'absences'
-// Le traitement log les informations du traitement dans l'onglet 'log'
 DAY_MILLIS = 24 * 60 * 60 * 1000;
 
 var logSheet;
@@ -13,34 +10,39 @@ var end;
 
 var allCalendars = [];
 
-// fonction principale :
-// - recherche de la plage de date depuis la feuille de calcul
-// - recherche des calendriers à scanner
-// - récupération des absences dans chaque calendrier
 function synchronizeOutOfOfficeFromCalendar() {
-  spreadSheet = SpreadsheetApp.getActiveSpreadsheet();
+  /*
+  // Describe this function
+  // This function is used to synchronize the calendar of the user with the spreadsheet
+  // The spreadsheet must have 3 sheets :
+  // - calendar : the calendar of the user
+  // - oOo : the out of office of the user
+  // - log : the log of the process
 
-  // préparation onglet 'log' (raz)
-  logSheet = spreadSheet.getSheetByName("log");
-  logSheet.clear();
-  sheetLog("info", "Process started");
+  :param: none
 
-  // préparation onglet 'ooo' (raz)
-  absencesSheet = spreadSheet.getSheetByName("oOo");
-  absencesSheet.clear();
-  calSheet = spreadSheet.getSheetByName("calendar");
+  :return: none
+  */
 
-  // récupération des calendriers du user exécutant le script
-  // le but est de déterminer les calendriers auxquels s'abonner dans la suite du traitement
-  //
-  // Fonctionnement à vérifier : les calendriers des collaborateurs ne sont pas pris en compte systématiquement.
-  // Alors que la doc Google explicite que tous les calendriers auxquel à souscrit l'utilisateur. (Bug? Délai de propagation de l'info?)
-  launcherAllCalendars = CalendarApp.getAllCalendars();
+  // Only use english
+
+  spreadSheet = SpreadsheetApp.getActiveSpreadsheet(); // Get the spreadsheet
+
+  logSheet = spreadSheet.getSheetByName("log"); // Get the log sheet
+  logSheet.clear(); // Clear the log sheet
+  sheetLog("info", "Process started"); // Log the start of the process
+
+  absencesSheet = spreadSheet.getSheetByName("oOo"); // Get the out of office sheet
+  absencesSheet.clear(); // Clear the out of office sheet
+  calSheet = spreadSheet.getSheetByName("calendar"); // Get the calendar sheet
+
+  launcherAllCalendars = CalendarApp.getAllCalendars(); // Get all the calendars of the user
   for (var a = 0; a < launcherAllCalendars.length; a++) {
+    // For each calendar of the user add it to the list of calendars of the user (allCalendars) and to the list of calendars to process (allCalendars)
     allCalendars.push(launcherAllCalendars[a].getId());
   }
 
-  // recherche de la date min et max de la ligne 4 (ligne des dates)
+  // Get the begin and the end of the period to process (the period is defined by the first line of the calendar sheet)
   var plage = calSheet
     .getRange("4:4")
     .getValues()[0]
@@ -50,165 +52,166 @@ function synchronizeOutOfOfficeFromCalendar() {
     .sort(function (a, b) {
       return a.getTime() - b.getTime();
     });
+
+  // If the period is not defined, log an error and stop the process
   begin = plage[0];
   end = plage[plage.length - 1];
 
-  // liste des adresses mails dans la colonne C. Une adresse est simplement caractérisée par un @
+  // If the period is not defined, log an error and stop the process
   var ids = calSheet
     .getRange("B:B")
     .getValues()
     .filter(function (obj) {
-      if (!(typeof obj[0] === "string")) return false;
-      if (obj[0].indexOf("@") === -1) return false;
+      if (!(typeof obj[0] === "string")) {
+        return false;
+      }
+      if (obj[0].indexOf("@") === -1) {
+        return false;
+      }
       return true;
     })
     .sort();
 
-  // Boucle sur les calendriers des adresses mail trouvées
   for (var a = 0; a < ids.length; a++) {
+    // For each calendar of the user add it to the list of calendars of the user (allCalendars) and to the list of calendars to process (allCalendars)  
     lookUpOneCalendar(ids[a]);
   }
 
-  sheetLog("info", "Process ended");
+  sheetLog("info", "Process ended"); // Log the end of the process
 }
 
-// Traitement d'un Calendier
-// Remarque : pour faire une recherche dans un calendrier il faut d'abord s'y abonner
 function lookUpOneCalendar(id) {
-  sheetLog("info", "Start of calendar process " + id);
-  var cal;
-  var unsubscribe = false;
+  /*
+  This function is used to synchronize the calendar of the user with the spreadsheet
+  
+  :param: id: the id of the calendar to process
 
-  // on vérifie si l'utilisateur est déjà ou non abonné à un calendrier
+  :return: none
+  */
+  sheetLog("info", "Start of calendar process " + id); // Log the start of the process
+  var cal; // The calendar to process
+  var unsubscribe = false; // If the calendar is not subscribed, unsubscribe it at the end of the process
+
   if (!containsObject(id, allCalendars)) {
-    // s'il n'est pas abonné, on s'y abonne
-    sheetLog("info", "calendar " + id + " not subscripted");
+    sheetLog("info", "calendar " + id + " not found");
     try {
-      cal = CalendarApp.subscribeToCalendar(id);
-      unsubscribe = true;
+      cal = CalendarApp.subscribeToCalendar(id); // Subscribe the calendar
+      unsubscribe = true; // Set the flag to unsubscribe the calendar at the end of the process
     } catch (err) {
-      // cas où il n'existe pas de calendrier publique correspondant à l'adresse mail
-      sheetLog("alert", "calendar " + id + " unfound");
-      sheetLog("info", "End of calendar process " + id);
+      sheetLog("alert", "calendar " + id + " Error"); // Log an error
+      sheetLog("info", "End of calendar process " + id); // Log the end of the process
       return;
     }
   } else {
-    //si l'utilisateur est déjà abonné, on récupère directement le calendrier
-    sheetLog("info", "calendar " + id + " subcripted");
-    cal = CalendarApp.getCalendarById(id);
+    sheetLog("info", "calendar " + id + " subscribed"); // Log the subscription of the calendar
+    cal = CalendarApp.getCalendarById(id); // Get the calendar
   }
 
-  // recherche des événement sur le critère 'Absent du bureau' (titre en dur des événements
-  // créés dans l'agenda avec le type 'Absent du bureau')
-  var events = cal.getEvents(begin, end, { search: "Absent du bureau" });
+  var events = cal.getEvents(begin, end, { search: "Absent du bureau" }); // Get the events of the calendar
   var events = events.concat(
     cal.getEvents(begin, end, { search: "Out of Office" })
-  );
+  ); // Get the events of the calendar
 
   var event;
   var dates;
   var fraction;
-  var duree;
+  var duration;
 
-  // boucle sur les événements trouvés
   for (var i = 0; i < events.length; i++) {
-    event = events[i];
+    event = events[i]; // Get the event
 
-    // on ne traite que les événements dont le titre est 'Absent du bureau'
-    // (les fonctions Javascript de Google ne semble pas proposer mieux pour le moment)
-    // --> probablement lié à la nouveauté de la fonctionnalité 'out of office'. Possible
-    // que Google propose plus précis par la suite
-    // 28/10/20 - DEBUT modif EDARCO + 29/06 Ajout Absent du bureau Congés
     if (
       event.getTitle() == "Absent du bureau" ||
       event.getTitle() == "Out of office"
     ) {
-      // création de la liste de jour entre la date de début (incluse) et la date de fin (exclue i.e - 1 milliseconde)
       dates = createDateSpan(
         event.getStartTime(),
         new Date(event.getEndTime().getTime() - 1)
-      );
+      ); // Get the dates of the event
 
-      // pour chaque jour de la plage
       for (var j = 0; j < dates.length; j++) {
-        // en colonne 1 : l'adresse mail
-        absencesSheet.getRange(rowAbsence, 1).setValue(cal.getId());
-        // en colonne 2 : la date du jour
-        absencesSheet.getRange(rowAbsence, 2).setValue(dateTrunc(dates[j]));
-        // la colonne 3 est une concaténation des colonnes 1 et 2 pour pouvoir être utilisée
-        // par une formule VLOOKUP dans la feuille de calcul
+        absencesSheet.getRange(rowAbsence, 1).setValue(cal.getId()); // Set the calendar id
+        absencesSheet.getRange(rowAbsence, 2).setValue(dateTrunc(dates[j])); // Set the date
         absencesSheet
           .getRange(rowAbsence, 3)
           .setFormulaR1C1(
             '=CONCAT(INDIRECT("R[0]C[-2]";FALSE);INDIRECT("R[0]C[-1]";FALSE))'
-          );
-        // 28/10/20 - EDARCO
+          ); // Set the title
 
-        // Si Absence ou Out of Office
-        if (event.getTitle() != "Télétravail") {
-          // en colonne 4 : une fraction de journée
-          // 1 pour indiquer une journée complète
-          // 0,5 pour les journée non complète
-          fraction = 1;
+        if (
+          event.getTitle() != "Télétravail" &&
+          event.getTitle() != "Home office"
+        ) {
+          fraction = 1; // Set the fraction to 1
           if (
             j === 0 &&
             event.getStartTime().getHours() * 60 +
               event.getStartTime().getMinutes() >
               0
           ) {
-            // EDARCO 29/06 -  fraction = 0.5;
-            duree =
+            duration =
               event.getEndTime().getHours() * 60 +
               event.getEndTime().getMinutes() -
               (event.getStartTime().getHours() * 60 +
                 event.getStartTime().getMinutes());
 
-            if (duree > 4 * 60) {
+            if (duration > 4 * 60) {
               fraction = 1;
-            } else if (duree > 2 * 60) {
+            } else if (duration > 2 * 60) {
               fraction = 0.5;
-            } else break;
-          }
+            } else {
+              break;
+            }
+          } 
           if (
             j === dates.length - 1 &&
             event.getEndTime().getHours() * 60 +
               event.getEndTime().getMinutes() >
               0
           ) {
-            // EDARCO 29/06 -  fraction = 0.5;
-            duree =
+            duration =
               event.getEndTime().getHours() * 60 +
               event.getEndTime().getMinutes() -
               (event.getStartTime().getHours() * 60 +
                 event.getStartTime().getMinutes());
 
-            if (duree > 4 * 60) {
+            if (duration > 4 * 60) {
               fraction = 1;
-            } else if (duree > 3 * 60) {
+            } else if (duration > 3 * 60) {
               fraction = 0.5;
             } else break;
           }
-          absencesSheet.getRange(rowAbsence, 4).setValue(fraction);
+          absencesSheet.getRange(rowAbsence, 4).setValue(fraction); // Set the fraction
         }
-        rowAbsence++;
+        rowAbsence++; // Increment the row of the out of office sheet
       }
     }
   }
 
-  // désabonnement pour revenir à la situation de départ (pour pas que l'utilisateur
-  // se retrouve avec tous les calendriers scannés dans son interface utilisateur)
-  // ne marche pas toujours dans le cas de collaborateurs présents dans l'interface utilisateur
-  // Calendar avant le passage du traitrement (ils sont alors désabonnés)
-  // --> bug ou mauvais fonctionnement de la fonction Google getAllCalendars()
   if (unsubscribe) {
-    cal.unsubscribeFromCalendar();
+    cal.unsubscribeFromCalendar();  // Unsubscribe the calendar
   }
-  sheetLog("info", "End of calendar process " + id);
+  sheetLog("info", "End of calendar process " + id);  // Log the end of the process
 }
 
-// fonction utilitaire pour créer une liste de dates comprises entre une date de début
-// et une date de fin
+// creaate a unit test for createDateSpan
+function testCreateDateSpan() {
+  var startDate = new Date(2019, 0, 1);
+  var endDate = new Date(2019, 0, 3);
+  var dates = createDateSpan(startDate, endDate);
+  Logger.log(dates);
+  var assert = require("assert");
+  assert.equals(createDateSpan(startDate, endDate), [ startDate, endDate ]);
+}
 function createDateSpan(startDate, endDate) {
+  /*
+  This function is used to create a list of dates between two dates
+
+  :param: startDate: the start date
+  :param: endDate: the end date
+
+  :return: dates: the list of dates between the two dates
+  */
   if (startDate.getTime() > endDate.getTime()) {
     throw Error("startDate > endDate");
   }
@@ -224,8 +227,23 @@ function createDateSpan(startDate, endDate) {
   return dates;
 }
 
-// fonction utilitaire de comparaison de 2 dates (ne tient pas compte des heures, minutes, secondes, millis)
+function testDateCompare() {
+  var date1 = new Date(2019, 0, 1);
+  var date2 = new Date(2019, 0, 1);
+  var assert = require("assert");
+  assert.equals(dateCompare(date1, date2), true);
+  var date3 = new Date(2019, 0, 2);
+  assert.equals(dateCompare(date1, date3), false);
+}
 function dateCompare(a, b) {
+  /*
+  This function is used to compare two dates
+
+  :param: a: the first date
+  :param: b: the second date
+
+  :return: true if the two dates are equals, false otherwise
+  */
   return (
     a.getFullYear() === b.getFullYear() &&
     a.getMonth() === b.getMonth() &&
@@ -233,13 +251,37 @@ function dateCompare(a, b) {
   );
 }
 
-// fonction utilitaire pour retourner une date sans heure, minute, seconde et milliseconde
+function testDateTrunc() {
+  var date1 = new Date(2019, 0, 1, 12, 0, 0);
+  var date2 = new Date(2019, 0, 1, 0, 0, 0);
+  var assert = require("assert");
+  assert.equals(dateTrunc(date1), date2);
+}
 function dateTrunc(d) {
+  /*
+  This function is used to truncate a date
+
+  :param: d: the date to truncate
+
+  :return: the truncated date
+  */
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-// fonction utilitaire pour écrire dans l'onglet 'log'
+function testSheetLog() {
+  var assert = require("assert");
+  assert.equals(sheetLog("info", "test", "T"), undefined);
+}
 function sheetLog(level, msg, cptl) {
+  /*
+  This function is used to log a message in the log sheet
+
+  :param: level: the level of the message
+  :param: msg: the message to log
+  :param: cptl: the capital letter of the level
+
+  :return: none
+  */
   logSheet
     .getRange(rowLog, 1)
     .setValue(
@@ -261,9 +303,20 @@ function sheetLog(level, msg, cptl) {
   rowLog++;
 }
 
-// fonction utilitaire pour chercher si la représentation en chaîne de caractères d'un objet
-// est dans une liste
+function testContainsObject() {
+  var assert = require("assert");
+  assert.equals(containsObject("test", ["test", "test2"]), true);
+  assert.equals(containsObject("test", ["test2"]), false);
+}
 function containsObject(obj, list) {
+  /*
+  This function is used to check if an object is in a list
+
+  :param: obj: the object to check
+  :param: list: the list to check
+
+  :return: true if the object is in the list, false otherwise
+  */
   var i;
   for (i = 0; i < list.length; i++) {
     if (list[i].toString() === obj.toString()) {
@@ -274,8 +327,18 @@ function containsObject(obj, list) {
   return false;
 }
 
-// fonction pour ajouter la fonction principal dans le menu de la feuille de calcul
+function testOnOpen() {
+  var assert = require("assert");
+  assert.equals(onOpen(), undefined);
+}
 function onOpen() {
+  /*
+  This function is used to add a menu to the spreadsheet
+
+  :param: none
+
+  :return: none
+  */
   var sheet = SpreadsheetApp.getActiveSpreadsheet();
   var menuEntries = [
     {
