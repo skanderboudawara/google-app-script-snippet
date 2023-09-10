@@ -1,4 +1,4 @@
-function attachement_management() {
+function attachementManagement() {
   /*
   This function will search for all the emails from the list of email addresses
 
