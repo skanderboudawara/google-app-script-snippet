@@ -302,7 +302,6 @@ function initialisation(
 // Just add the user in the list of guests of the selected event
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// create unit test for registerUserToEvent
 function testRegisterUserToEvent() {
   // Test registerUserToEvent function
   var assert = require("assert");
@@ -515,7 +514,7 @@ function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
-// create unit test for ldapDate
+// create  test for ldapDate
 function testLdapDate() {
   // Test ldapDate function
   var assert = require("assert");
@@ -538,7 +537,6 @@ function ldapDate(d) {
   return formattedDate + "Z";
 }
 
-// create unit test for rfc3339Date
 function testRfc3339Date() {
   // Test rfc3339Date function
   var assert = require("assert");

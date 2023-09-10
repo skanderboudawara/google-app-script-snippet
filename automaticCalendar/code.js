@@ -37,7 +37,6 @@ function synchronizeOutOfOfficeFromCalendar() {
 
   launcherAllCalendars = CalendarApp.getAllCalendars(); // Get all the calendars of the user
   for (var a = 0; a < launcherAllCalendars.length; a++) {
-    // For each calendar of the user add it to the list of calendars of the user (allCalendars) and to the list of calendars to process (allCalendars)
     allCalendars.push(launcherAllCalendars[a].getId());
   }
 
@@ -52,6 +51,7 @@ function synchronizeOutOfOfficeFromCalendar() {
       return a.getTime() - b.getTime();
     });
 
+
   // If the period is not defined, log an error and stop the process
   begin = plage[0];
   end = plage[plage.length - 1];
@@ -61,13 +61,7 @@ function synchronizeOutOfOfficeFromCalendar() {
     .getRange("B:B")
     .getValues()
     .filter(function (obj) {
-      if (!(typeof obj[0] === "string")) {
-        return false;
-      }
-      if (obj[0].indexOf("@") === -1) {
-        return false;
-      }
-      return true;
+      return typeof obj[0] === "string" && obj[0].indexOf("@") !== -1;
     })
     .sort();
 
@@ -91,19 +85,25 @@ function lookUpOneCalendar(id) {
   var cal; // The calendar to process
   var unsubscribe = false; // If the calendar is not subscribed, unsubscribe it at the end of the process
 
+    // If the calendar is not found in the list of all calendars, subscribe the calendar
+  // Set the flag to unsubscribe the calendar at the end of the process
   if (!containsObject(id, allCalendars)) {
     sheetLog("info", "calendar " + id + " not found");
     try {
-      cal = CalendarApp.subscribeToCalendar(id); // Subscribe the calendar
-      unsubscribe = true; // Set the flag to unsubscribe the calendar at the end of the process
+      cal = CalendarApp.subscribeToCalendar(id);
+      unsubscribe = true;
     } catch (err) {
-      sheetLog("alert", "calendar " + id + " Error"); // Log an error
-      sheetLog("info", "End of calendar process " + id); // Log the end of the process
+      // Log an error
+      sheetLog("alert", "calendar " + id + " Error");
+      // Log the end of the process
+      sheetLog("info", "End of calendar process " + id);
       return;
     }
   } else {
-    sheetLog("info", "calendar " + id + " subscribed"); // Log the subscription of the calendar
-    cal = CalendarApp.getCalendarById(id); // Get the calendar
+    // Log the subscription of the calendar
+    sheetLog("info", "calendar " + id + " subscribed");
+    // Get the calendar
+    cal = CalendarApp.getCalendarById(id);
   }
 
   var events = cal.getEvents(begin, end, { search: "Absent du bureau" }); // Get the events of the calendar
@@ -143,30 +143,14 @@ function lookUpOneCalendar(id) {
         ) {
           fraction = 1; // Set the fraction to 1
           if (
-            j === 0 &&
-            event.getStartTime().getHours() * 60 +
-              event.getStartTime().getMinutes() >
-              0
-          ) {
-            duration =
+            (j === 0 &&
+              event.getStartTime().getHours() * 60 +
+                event.getStartTime().getMinutes() >
+                0) ||
+            (j === dates.length - 1 &&
               event.getEndTime().getHours() * 60 +
-              event.getEndTime().getMinutes() -
-              (event.getStartTime().getHours() * 60 +
-                event.getStartTime().getMinutes());
-
-            if (duration > 4 * 60) {
-              fraction = 1;
-            } else if (duration > 2 * 60) {
-              fraction = 0.5;
-            } else {
-              break;
-            }
-          } 
-          if (
-            j === dates.length - 1 &&
-            event.getEndTime().getHours() * 60 +
-              event.getEndTime().getMinutes() >
-              0
+                event.getEndTime().getMinutes() >
+                0)
           ) {
             duration =
               event.getEndTime().getHours() * 60 +
@@ -178,7 +162,11 @@ function lookUpOneCalendar(id) {
               fraction = 1;
             } else if (duration > 3 * 60) {
               fraction = 0.5;
-            } else break;
+            } else if (duration > 2 * 60) {
+              fraction = 0.5;
+            } else {
+              break;
+            }
           }
           absencesSheet.getRange(rowAbsence, 4).setValue(fraction); // Set the fraction
         }

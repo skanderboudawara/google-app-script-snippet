@@ -65,7 +65,6 @@ function updateDropdown(id, values) {
   item.asListItem().setChoiceValues(values);
 }
 
-// create unit testfor removeDuplicates
 function testRemoveDuplicates() {
   var arr = ["a", "b", "c", "a", "b", "c", "d"];
   var arr2 = ["a", "b", "c", "d"];
