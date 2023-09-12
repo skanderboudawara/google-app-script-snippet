@@ -17,9 +17,9 @@ function getDataFromDictionnary() {
   actualSpreadsheet = SpreadsheetApp.getActiveSpreadsheet(); // To get the current spreadsheet
 
   // To store all the data eg: {"dataset_name" : [["field1", "description"], ["field2", "description"], etc],}
-  var datasetMetadata = {}; 
+  var datasetMetadata = {};
   // To store all the data eg: {"field1" : ["dataset_name1", "dataset_name2"], "field2" : ["dataset_name1"], etc}
-  var fieldMapping = {}; 
+  var fieldMapping = {};
 
   menuSheet = actualSpreadsheet.getSheetByName(MENU_SHEET_NAME); // To get the sheet containing all the dataset names
   lastRowMenu = menuSheet.getLastRow();
@@ -31,6 +31,7 @@ function getDataFromDictionnary() {
     .flat(); // To get all the dataset names
   rangeDataSetsMenu = removeDuplicates(rangeDataSetsMenu); // To remove duplicates
 
+  var sheetsNotFound = []
   // To gather all field with description and build the datasetMetadata
   rangeDataSetsMenu.forEach(function (datasetName) {
     /*
@@ -79,6 +80,9 @@ function getDataFromDictionnary() {
     } catch (e) {
       // If the sheet is not found
       Logger.log(`${datasetName} sheet was not found`);
+      if (datasetName != '') {
+        sheetsNotFound.push(`❌ ${datasetName} sheet was not found`)
+      }
     }
   });
 
@@ -121,15 +125,18 @@ function getDataFromDictionnary() {
       .getRange(lastRowDictionnary + 1, 2, newFieldsDescription.length, 2)
       .setValues(newFieldsDescription); // To add the new field with description in the dictionnary
     lastRowDictionnary = lastRowDictionnary + newFieldsDescription.length - 1;
-    dictionnarySheet
-      .getRange(2, 1, lastRowDictionnary, 1)
-      .setFormula(
-        'IF(AND(COUNTIF(B:B,B340)>1,COUNTIF(C340,C:C)=1),"several description","ok")'
-      ); // To add the formula to check if the field with description is unique
   } else {
     // If there is no new field with description
     Logger.log("No New Fields with Description will be Added");
   }
+
+  // To update the generale formula
+  dictionnarySheet
+    .getRange(2, 1, lastRowDictionnary, 1)
+    .clearContent()
+    .setFormula(
+      '=IF(AND(COUNTIF(B:B,INDIRECT("B"&ROW()))>1,COUNTIF(INDIRECT("C"&ROW()),C:C)=1),"several description","ok")'
+  ); // To add the formula to check if the field with description is unique
 
   // Add Non Existing Dataset
   newDatasetsNames = findValuesNotInArray(
@@ -210,11 +217,13 @@ function getDataFromDictionnary() {
   dictionnarySheet
     .getRange(2, 4, newMatrix.length, newMatrix[0].length)
     .setValues(newMatrix); // To add the new matrix in the dictionnary
-  
+
   Logger.log("Process finished");
+
+  return sheetsNotFound
 }
 
-function ManualUpdateDictionnary() {
+function manualUpdateDictionary() {
   /*
   // This functions will update the dictionnary manually
 
@@ -223,12 +232,16 @@ function ManualUpdateDictionnary() {
   :return: None
 
   */
-  getDataFromDictionnary();
   var ui = SpreadsheetApp.getUi();
+  ui.alert("Processing will start");
+  var sheetsNotFound = getDataFromDictionnary();
+  if (sheetsNotFound.length > 0) {
+    ui.alert(sheetsNotFound.join('\n'));
+  }
   ui.alert("Dictionnary Updated");
 }
 
-function onOpen(){
+function onOpen() {
   /*
   // This functions will add a menu to the spreadsheet
 
@@ -237,10 +250,10 @@ function onOpen(){
   :return: None
 
   */
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu("✈️ Functions")
+    .addItem("Force Update Dictionary", "manualUpdateDictionary")
+    .addToUi();
+
   getDataFromDictionnary();
-  var sheet = SpreadsheetApp.getActiveSpreadsheet();
-  var menuEntries = [
-    {name: "Force Update Dictionnary", functionName: "ManualUpdateDictionnary"}
-  ];
-  sheet.addMenu("✈️ Functions", menuEntries);
 }
