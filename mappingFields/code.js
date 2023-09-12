@@ -74,8 +74,8 @@ function getDataFromDictionnary() {
         } else {
           fieldMapping[fieldName] = [datasetName];
         }
-        Logger.log(`Processed ${datasetName}`);
       });
+      Logger.log(`Processed ${datasetName}`);
     } catch (e) {
       // If the sheet is not found
       Logger.log(`${datasetName} sheet was not found`);
