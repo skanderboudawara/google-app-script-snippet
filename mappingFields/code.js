@@ -11,7 +11,7 @@ function getDataFromDictionnary() {
   
   :param: None
 
-  :return: None
+  :return: (Array), array of non existing sheets
   */
 
   actualSpreadsheet = SpreadsheetApp.getActiveSpreadsheet(); // To get the current spreadsheet
@@ -129,15 +129,20 @@ function getDataFromDictionnary() {
     // If there is no new field with description
     Logger.log("No New Fields with Description will be Added");
   }
+  
+  // Sort column B (excluding header)
+  dictionnarySheet.getRange(2, 2, lastRowDictionnary + 1, 2).sort({ column: 2, ascending: true }); 
+
+  // dictionnarySheet.getRange("B2:B" + dictionnarySheet.getLastRow()).sort({ column: 1, ascending: true }); // Sort in ascending order
 
   // To update the generale formula
   dictionnarySheet
-    .getRange(2, 1, lastRowDictionnary, 1)
+    .getRange(2, 1, lastRowDictionnary - 1, 1)
     .clearContent()
     .setFormula(
-      '=IF(AND(COUNTIF(B:B,INDIRECT("B"&ROW()))>1,COUNTIF(INDIRECT("C"&ROW()),C:C)=1),"several description","ok")'
-  ); // To add the formula to check if the field with description is unique
-
+      '=IF(AND(COUNTIF(B:B,INDIRECT("B"&ROW()))>1, OR(COUNTIF(INDIRECT("C"&ROW()),C:C)=1, COUNTIFS(B:B, INDIRECT("B"&ROW()), C:C, "<>") > 0)),"several description","ok")'
+    ); // To add the formula to check if the field with description is unique
+ 
   // Add Non Existing Dataset
   newDatasetsNames = findValuesNotInArray(
     dictionnaryDataDataSetName,
